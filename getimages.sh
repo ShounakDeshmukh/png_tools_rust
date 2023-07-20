@@ -13,4 +13,3 @@ if [ -d "pngsuite" ]; then
 else
   mkdir pngsuite && tar zxf $FILE -C pngsuite/
 fi
-
