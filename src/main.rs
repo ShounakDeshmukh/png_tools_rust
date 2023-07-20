@@ -8,26 +8,45 @@ use crc::{Crc, CRC_32_ISO_HDLC};
 const CRC: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 const PNG_SIGNATURE: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 // 89 50 4E 47 0D 0A 1A 0A
-const IHDR_HEX: [u8; 4] = [73, 72, 68, 82];
+// const IHDR_HEX: [u8; 4] = [73, 72, 68, 82];
 const LENGTH_IHDR: u8 = 13;
 fn main() -> io::Result<()> {
-    let mut buffer = match read_image() {
+    let mut buffer: Vec<u8> = match read_image() {
         Ok(buffer) => buffer,
-        Err(_) => panic!("Problem opening the file"),
+        Err(_) => {
+            eprintln!("Problem opening the file");
+            std::process::exit(1)
+        }
     };
 
     if buffer[0..=7] != PNG_SIGNATURE {
-        print!("Invalid file please choose a PNG")
+        eprintln!("Invalid file please choose a PNG")
     } else {
-        // rmove png signature
-        buffer = buffer[8..].to_vec();
+        // rmove png signature and
         // remove bytes signifying length of ihdr
-        buffer = buffer[4..].to_vec();
 
-        let checksum = ihdr_checksum(&buffer);
+        buffer = buffer[12..].to_vec();
 
-        if checksum != buffer[17..21] {
-            print!("INVALID IHDR CHECKSUM")
+        if ihdr_checksum(&buffer) {
+            eprintln!("INVALID IHDR CHECKSUM")
+        } else {
+            // remove IHDR ascii bytes
+            buffer = buffer[4..].to_vec();
+            let (img_h, img_w, bit_dep, colo_type, compress_meth, filter_meth, interlace_meth): (
+                u32,
+                u32,
+                u8,
+                u8,
+                u8,
+                u8,
+                u8,
+            ) = read_ihdr(&buffer);
+
+            println!(
+                "{} {} {} {} {} {} {}",
+                img_h, img_w, bit_dep, colo_type, compress_meth, filter_meth, interlace_meth
+            );
+            buffer = buffer[..].to_vec();
         }
     }
     println!("{:?}", buffer);
@@ -43,12 +62,32 @@ fn read_image() -> Result<Vec<u8>, io::Error> {
     Ok(buffer)
 }
 
-fn ihdr_checksum(buffer: &Vec<u8>) -> [u8; 4] {
+fn ihdr_checksum(buffer: &Vec<u8>) -> bool {
     let checksum_input: Vec<u8> = buffer[0..(LENGTH_IHDR + 4) as usize].to_vec();
     print!("{:?}", checksum_input);
     let checksum: [u8; 4] = CRC.checksum(&checksum_input).to_be_bytes();
     println!("{:?}", checksum);
-    checksum
+    checksum != buffer[17..21]
+}
+
+fn read_ihdr(buffer: &Vec<u8>) -> (u32, u32, u8, u8, u8, u8, u8) {
+    let img_h: u32 = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
+    let img_w: u32 = u32::from_be_bytes(buffer[4..8].try_into().unwrap());
+    let bit_dep: u8 = u8::from_be(buffer[8]);
+    let colo_type: u8 = u8::from_be(buffer[9]);
+    let compress_meth: u8 = u8::from_be(buffer[10]);
+    let filter_meth: u8 = u8::from_be(buffer[11]);
+    let interlace_meth: u8 = u8::from_be(buffer[12]);
+
+    (
+        img_h,
+        img_w,
+        bit_dep,
+        colo_type,
+        compress_meth,
+        filter_meth,
+        interlace_meth,
+    )
 }
 
 // let length_ihdr: u32 = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
