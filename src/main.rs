@@ -11,11 +11,10 @@ const PNG_SIGNATURE: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 const IHDR_HEX: [u8; 4] = [73, 72, 68, 82];
 const LENGTH_IHDR: u8 = 13;
 fn main() -> io::Result<()> {
-    let f = File::open("pngsuite/xhdn0g08.png")?;
-    let mut reader: BufReader<File> = BufReader::new(f);
-    let mut buffer: Vec<u8> = Vec::new();
-    reader.read_to_end(&mut buffer)?;
-    println!("{}", buffer.capacity());
+    let mut buffer = match read_image() {
+        Ok(buffer) => buffer,
+        Err(_) => panic!("Problem opening the file"),
+    };
 
     if buffer[0..=7] != PNG_SIGNATURE {
         print!("Invalid file please choose a PNG")
@@ -25,11 +24,7 @@ fn main() -> io::Result<()> {
         // remove bytes signifying length of ihdr
         buffer = buffer[4..].to_vec();
 
-        let checksum_input: Vec<u8> = buffer[0..(LENGTH_IHDR + 4) as usize].to_vec();
-        print!("{:?}", checksum_input);
-
-        let checksum: [u8; 4] = CRC.checksum(&checksum_input).to_be_bytes();
-        println!("{:?}", checksum);
+        let checksum = ihdr_checksum(&buffer);
 
         if checksum != buffer[17..21] {
             print!("INVALID IHDR CHECKSUM")
@@ -38,6 +33,22 @@ fn main() -> io::Result<()> {
     println!("{:?}", buffer);
 
     Ok(())
+}
+
+fn read_image() -> Result<Vec<u8>, io::Error> {
+    let f = File::open("pngsuite/basn0g01.png")?;
+    let mut reader: BufReader<File> = BufReader::new(f);
+    let mut buffer: Vec<u8> = Vec::new();
+    reader.read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
+
+fn ihdr_checksum(buffer: &Vec<u8>) -> [u8; 4] {
+    let checksum_input: Vec<u8> = buffer[0..(LENGTH_IHDR + 4) as usize].to_vec();
+    print!("{:?}", checksum_input);
+    let checksum: [u8; 4] = CRC.checksum(&checksum_input).to_be_bytes();
+    println!("{:?}", checksum);
+    checksum
 }
 
 // let length_ihdr: u32 = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
