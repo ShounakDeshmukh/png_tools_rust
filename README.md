@@ -1,6 +1,6 @@
 # PNG TOOLS RUST (WIP)
 
-Exploring editing raw png bytes to make utility functions
+Implementing the entire PNG specification in RUST for Faster encoding and decoding
 \
 Using testset for PNG-(de)coders created by Willem van Schaik
 which can be found [here](http://www.schaik.com/pngsuite/pngsuite.html)
