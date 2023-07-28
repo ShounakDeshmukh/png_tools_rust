@@ -5,13 +5,15 @@ use std::io::Read;
 
 use crc::{Crc, CRC_32_ISO_HDLC};
 
+mod Headers;
+mod constants;
+use Headers::IHDR;
+
 const CRC: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 const PNG_SIGNATURE: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
-// 89 50 4E 47 0D 0A 1A 0A
-// const IHDR_HEX: [u8; 4] = [73, 72, 68, 82];
-const LENGTH_IHDR: u8 = 13;
 fn main() {
     let Ok(mut buffer) = read_image() else {panic!("Problem opening the file")};
+    read_headers(&buffer);
 
     if buffer[0..=7] != PNG_SIGNATURE {
         panic!("Invalid file please choose a PNG")
@@ -26,20 +28,8 @@ fn main() {
             } else {
                 // remove IHDR ascii bytes
                 buffer = buffer[4..].to_vec();
-                let (img_h, img_w, bit_dep, colo_type, compress_meth, filter_meth, interlace_meth): (
-                u32,
-                u32,
-                u8,
-                u8,
-                u8,
-                u8,
-                u8,
-            ) = read_ihdr(&buffer);
+                read_ihdr(&buffer);
 
-                println!(
-                    "{} {} {} {} {} {} {}",
-                    img_h, img_w, bit_dep, colo_type, compress_meth, filter_meth, interlace_meth
-                );
                 buffer = buffer[..].to_vec();
             }
             println!("{buffer:?}");
@@ -47,8 +37,14 @@ fn main() {
     }
 }
 
+fn read_headers(buffer: &Vec<u8>) {
+    for (idx, i) in buffer.windows(4).enumerate() {
+        println!("{}  {:?}", idx, i)
+    }
+}
+
 fn read_image() -> Result<Vec<u8>, io::Error> {
-    let f = File::open("pngsuite/basn0g0.png")?;
+    let f = File::open("pngsuite/basn0g16.png")?;
     let mut reader: BufReader<File> = BufReader::new(f);
     let mut buffer: Vec<u8> = Vec::new();
     reader.read_to_end(&mut buffer)?;
@@ -56,14 +52,14 @@ fn read_image() -> Result<Vec<u8>, io::Error> {
 }
 
 fn ihdr_checksum(buffer: &Vec<u8>) -> bool {
-    let checksum_input: Vec<u8> = buffer[0..(LENGTH_IHDR + 4) as usize].to_vec();
+    let checksum_input: Vec<u8> = buffer[0..(13 + 4) as usize].to_vec();
     print!("{:?}", checksum_input);
     let checksum: [u8; 4] = CRC.checksum(&checksum_input).to_be_bytes();
     println!("{:?}", checksum);
     checksum != buffer[17..21]
 }
 
-fn read_ihdr(buffer: &Vec<u8>) -> (u32, u32, u8, u8, u8, u8, u8) {
+fn read_ihdr(buffer: &Vec<u8>) -> IHDR {
     let img_h: u32 = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
     let img_w: u32 = u32::from_be_bytes(buffer[4..8].try_into().unwrap());
     let bit_dep: u8 = u8::from_be(buffer[8]);
@@ -71,16 +67,7 @@ fn read_ihdr(buffer: &Vec<u8>) -> (u32, u32, u8, u8, u8, u8, u8) {
     let compress_meth: u8 = u8::from_be(buffer[10]);
     let filter_meth: u8 = u8::from_be(buffer[11]);
     let interlace_meth: u8 = u8::from_be(buffer[12]);
-
-    (
-        img_h,
-        img_w,
-        bit_dep,
-        colo_type,
-        compress_meth,
-        filter_meth,
-        interlace_meth,
-    )
+    IHDR::new()
 }
 
 fn read_data() {}
